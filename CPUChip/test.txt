@@ -1,0 +1,13 @@
+#pragma set OutputDebugListing true
+#pragma set OutputResolveListing true
+#pragma set NoUnreferencedLeaves false
+
+#define MACRO fint
+
+LOL:
+mov eax, 3;
+mov ebx, 4;
+div eax, ebx;
+HUE:
+//MACRO fint;
+mov port0, eax;
