@@ -6,9 +6,11 @@
 @trigger 
 
 if(->CC&!->Mode) {
+    #ifdef entity:createWire(entity, string, string)
     CC:entity():createWire(entity(), "Activated", "Mode")
     CC:entity():createWire(entity(), "Angle", "OutAng")
     CC:entity():createWire(entity(), "Position", "OutPos")
+    #endif
 }
 
 if(first()|duped()) {
@@ -22,8 +24,10 @@ if(first()|duped()) {
     }
     cameraCreate(1)]#
     
+    #ifdef lightCreate(number, vector, vector, number, number)
     lightCreate(1, vec(0, 0, 0), vec(255, 255, 255), 4096, 16)
     lightToggle(1, 0)
+    #endif
     
     MODE_OFF=0
     MODE_THROUGH=1
@@ -90,7 +94,9 @@ if(first()|duped()) {
         }
 #[        cameraPos(1, P)
         cameraAng(1, A)]#
+        #ifdef lightPos(number, vector)
         lightPos(1, P)
+        #endif
         OutPos=P
         OutAng=A
         if(owner():keyUse()&!LastUse) {
@@ -187,19 +193,27 @@ if(first()|duped()) {
     }
     
     function void clLight(Args:table, Ret:table) {
+        #ifdef lightToggle(number, number)
         lightToggle(1, Args[1, number])
+        #endif
     }
     
     function void clBrightness(Args:table, Ret:table) {
+        #ifdef lightBrightness(number, number)
         lightBrightness(1, Args[1, number])
+        #endif
     }
     
     function void clDistance(Args:table, Ret:table) {
+        #ifdef lightDistance(number, number)
         lightDistance(1, Args[1, number])
+        #endif
     }
     
     function void clColor(Args:table, Ret:table) {
+        #ifdef lightColor(number, vector)
         lightColor(1, Args[1, vector])
+        #endif
     }
     
     Env=newEnv()
@@ -210,7 +224,7 @@ if(first()|duped()) {
     Env:envAddCommand(newCommand("manself", "ccManualSelf", ""))
     Env:envAddCommand(newCommand("mancur", "ccManualCur", ""))
     Env:envAddCommand(newCommand("mancurnt", "ccManualCurNoTarget", ""))
-    Env:envAddCommand(newCommand("settarg", "ccSetTarg", "Op"))
+    Env:envAddCommand(newCommand("settarg", "ccSetTarg", "Oe"))
     Env:envAddCommand(newCommand("reset", "ccReset", ""))
     Env:envAddCommand(newCommand("light", "clLight", "n"))
     Env:envAddCommand(newCommand("brightness", "clBrightness", "n"))

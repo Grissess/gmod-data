@@ -36,6 +36,7 @@
 #   @ : Your entity
 #   [@plyname : The player entity of plyname
 #   [!plyname : The entity player plyname is looking at
+#   %id : Entity with the given ID
 #O: Optional. Arguments past this aren't required and shouldn't raise an error if not present.
 #r: The rest of the buffer (with quotes removed).
 #Your function will receive two arguments. The first is a table-array formatted as above; the second
@@ -148,6 +149,8 @@ function table argsparse(Parts:table, Signature:string) {
                 } else {
                     return Ret:retSetError("Unknown remote player mode: "+Mode)
                 }
+            } elseif(Part:left(1) == "%") {
+                Ret:pushEntity(entity(Part:sub(2):toNumber()))
             } else {
                 return Ret:retSetError("Unknown entity specification: "+Part)
             }

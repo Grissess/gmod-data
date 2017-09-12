@@ -1,0 +1,23 @@
+#ifndef SELENE_STD
+#define SELENE_STD
+
+#pragma set OutputResolveListing true
+#pragma set NoUnreferencedLeaves false
+
+#define NULL 0
+
+char bits_add(char v, char b) {
+    return v | b;
+}
+
+char bits_remove(char v, char b) {
+    BNOT b;
+    return v & b;
+}
+
+char to_int(float v) {
+    FINT v;
+    return v;
+}
+
+#endif

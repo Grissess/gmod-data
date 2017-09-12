@@ -1,1 +1,1 @@
-CPUChip/lunos/string.txt;CPUChip/lunos/io.txt;CPUChip/lunos/lufs.txt;CPUChip/lunos/error.txt;CPUChip/lunos/sframe.txt;CPUChip/lunos/intr.txt;CPUChip/lunos/regs.txt;CPUChip/lunos/math.txt;CPUChip\lunos/intr.txt;CPUChip/lunos/drv/console.txt;CPUChip/lunos/mm.txt;CPUChip/lunos/test/drv_basic.txt
+CPUChip/lunos/string.txt;cpuchip/lunos/driver.txt;cpuchip/selene/mm.txt;cpuchip/selene/std.txt;cpuchip/selene/pmalloc.txt;cpuchip/selene/cpu.txt;cpuchip/test2.txt;cpuchip/lunos/drv/console.txt

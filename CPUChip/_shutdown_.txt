@@ -1,157 +1,362 @@
 //LunOS -- Lunar Operating System
-//mm -- Memory Management
+//driver -- Driver Framework
+//console -- Console Screen Driver
 
-#ifndef LUNOS_MM
-#define LUNOS_MM
+//This driver controls all console screens attached to a LunOS system.
 
+//#pragma set OutputDebugListing true
+//#pragma set OutputBinaryListing true
+//#pragma set OutputTokenListing true
+//#pragma set OutputCodeTree true
+//#pragma set OutputFinalListing true
+#pragma set OutputResolveListing true
+#pragma set NoUnreferencedLeaves false
+
+//[DEFINE] LUNOS_DRV_CNS
+#ifndef LUNOS_DRV_CNS
+#define LUNOS_DRV_CNS
+
+#include <lunos/driver.txt>
+#include <lunos/list.txt>
+#include <lunos/math.txt>
+#include <lunos/io.txt>
 #include <lunos/error.txt>
 
-//LunOS uses a rather naive method of managing memory that I shall elaborate on here. Despite being rather
-//naive, it should still remain quite fast.
+//Copypasta inbound (SUE ME :D)
+//Console screen registers
+#define CNS_CURSOR_RATE       2043
+#define CNS_CURSOR_SIZE       2044
+#define CNS_CURSOR_POSITION   2045
+#define CNS_CURSOR_VISIBLE    2046
+#define CNS_LOW_SHIFT_COL     2031
+#define CNS_HIGH_SHIFT_COL    2032
+#define CNS_LOW_SHIFT_ROW     2033
+#define CNS_HIGH_SHIFT_ROW    2034
+#define CNS_SHIFT_ROWS        2038
+#define CNS_SHIFT_CELLS       2037
+#define CNS_CLEAR_SCREEN      2041
+#define CNS_BACKGROUND_COLOR  2042
+#define CNS_SCREEN_ACTIVE     2047
+#define CNS_SCREEN_ROTATION   2024
+#define CNS_SCREEN_BRIGHTNESS 2036
 
-//The memory manager is self-contained inside a single structure, the MMI (Memory Manager Information)
-//structure. This structure should start out zeroed, and it should be initialized from KMInit() and that
-//function ONLY. The structure should be treated as opaque.
+#define CA_FG_BLUE 1
+#define CA_FG_BLUE_MID 5
+#define CA_FG_BLUE_MAX 9
+#define CA_FG_GREEN 10
+#define CA_FG_GREEN_MID 50
+#define CA_FG_GREEN_MAX 90
+#define CA_FG_RED 100
+#define CA_FG_RED_MID 500
+#define CA_FG_RED_MAX 900
+#define CA_FG_BLACK 0
+#define CA_FG_GRAY 555
+#define CA_FG_WHITE 999
+#define CA_BG_BLUE 1000
+#define CA_BG_BLUE_MID 5000
+#define CA_BG_BLUE_MAX 9000
+#define CA_BG_GREEN 10000
+#define CA_BG_GREEN_MID 50000
+#define CA_BG_GREEN_MAX 90000
+#define CA_BG_RED 100000
+#define CA_BG_RED_MID 500000
+#define CA_BG_RED_MAX 900000
+#define CA_BG_BLACK 0
+#define CA_BG_GRAY 555000
+#define CA_BG_WHITE 999000
+#define CA_FLASH 1000000
+#define CA_MID 5
+#define CA_MAX 9
+#define CA_NOCHANGE -1
 
-//The manager works with the following information:
-//-It works in terms of pages. When memory is requested, every page therein is scanned for some free
-// memory. If it has enough, the page's refcount goes up, and that amount of memory is allocated.
-// Note that the memory usage in a page never actually goes down until the refcount is set to 0--at
-// which point the entire page is freed.
-//-The range you give to MMInit is inclusive, and will include some memory reserved for administration
-// structures. The structures will not include self-referential pages--the MMI structure is smart
-// enough to know not to include that.
-//-Memory pages have a tag and a disposition. The tag has a kernel-assigned meaning--typically,
-// positive numbers are PIDs, and all other (non-positive) numbers are reserved. 0 is assigned to
-// all pages on init and free, and generally represents generic kernel memory. Disposition is just
-// a hint to the system as to what the memory will be used for--and usually drives the RWX policies
-// for that page, but those policies are actually independent.
+#define CNS_CELLSZ 2
+#define CNS_SIZE 2048
+#define CNS_IOBUF_SZ 16
 
-//Actually allocating and deallocating occurs through MMAlloc and MMFree (and friends), which expect 
-//the MMI. However, instead of providing an address directly, both work on a two byte structure called
-//a "buffer cell" which is expected to be statically
-//allocated by the code (or on the stack). This is required because the size of the allocated region
-//must be retained for this algorithm to function reliably (especially when performing multi-page
-//allocations). Accessing the memory that was allocated can be done through the buffer cell's first
-//member, a real pointer to the allocated memory somewhere inside the MMI's arena.
+string drvCnsCharNewLine, "\n";
+string drvCnsCharTab, "\t";
+string drvCnsCharCarriageReturn, "\r";
+string drvCnsCharFormFeed, "\f";
+string drvCnsCharBackSpace, "\b";
 
-#define MF_DISABLE 1
-//Disables the page--accesses to it fail with an IO fault (INT 7).
-#define MF_REMAP 2
-//Causes access to the page to remap to another physical page (no further mapping is done).
-//The target page is specified by the second byte of the two-byte page entry.
-#define MF_TRAP 4
-//Says it will raise a page trap (INT 30), but doesn't actually appear to. Bug?
-#define MF_OVERRIDE 8
-//Sets the MEMRQ register (see regs.txt), and raises INT 29 for reading or INT 30 for writing.
-//On reading, the actually returned data will be whatever is in the LADD register (which may be
-//set with CPUSET). This requires two calls into the read/write for the same memory bus, so
-//using it is pretty damned slow and thereby discouraged.
-#define MF_NOREAD 32
-//Causes a read access violation (INT 12) when an attempt is made to read.
-#define MF_NOWRITE 64
-//Causes a write access violation (INT 9) when an attempt is made to write.
-#define MF_NOEXEC 128
-//Cause an execution access violation (INT 14) when an attempt is made to execute (from runlevel!=0).
+char drvCnsTabWidth=5;
 
-#define MF_SH_RUNLEVEL 8
-//How far to right-shift the flags to get the (unmasked) runlevel.
-#define MF_MK_RUNLEVEL 255
-//The AND mask to apply to the resulting shift to get the runlevel.
+char *_DrvCnsList[DRV_LIST_SZ];
 
-#define PTE_FLAGS 0
-//ZVM PTBL flags (see MF_* above) as well as the runlevel (MF_*_RUNLEVEL).
-#define PTE_REMAP 1
-//Page to remap access to (if MF_REMAP is set).
-#define PTE_SZ 2
-
-#define PAGE_SIZE 128
-#define PAGE_SHIFT 7
-//...which is log2(128), of course.
-
-//The actual PAST contains this header...
-#define PAST_ENTRIES 0
-//Number of entries in the PAST.
-#define PAST_ROOT 1
-//Page number of the first page represented in the PAST, as relative to all virtual memory
-//(this permits shrinking the table to cover a partial region of upper memory, which the ZVM PTBL
-//can't do as of this writing).
-#define PAST_SZ 2
-
-//...which is then followed by PAST_ENTRIES number of these Page Administration Structures.
-#define PAS_USED 0
-//How many bytes are used (in [0, PAGE_SIZE]).
-#define PAS_REFCNT 1
-//References held into this page, incremented on alloc, decremented on free.
-#define PAS_TAG 2
-//A tag byte to be used by whomever needs additional info on this page (usually the kernel).
-#define PAS_DISPOS 3
-//The page disposition (see DISPOS_*), indicating the alleged use of this page.
-#define PAS_SZ 4
-
-#define MMI_ARENA 0
-//Pointer to the start of the arena--where memory is actually allocated from
-#define MMI_ARENASIZE 1
-//Size of the arena.
-#define MMI_PTBL 2
-//Pointer to the start of the ZVM page table.
-#define MMI_PAST 3
-//Pointer to the page administration [structure] table, where heap structure information is stored.
-#define MMI_FLAGS 4
-//Some flags
-#define MMI_SZ 5
-
-#define MMIF_NOPTBL 1
-//Do not set MMI_PTBL--this allocator should not maintain a ZVM page table. Useful for non-kernel use.
-
-#define DISPOS_GENERIC 0
-//No particular disposition, RWX.
-#define DISPOS_DATA 1
-//Allocated as heap or buffer space, RW.
-#define DISPOS_CODE 2
-//Allocated for program code, RX.
-#define DISPOS_RODATA 3
-//Allocated as read-only data (usually set later, or used by the kernel), R.
-#define DISPOS_STACK 4
-//Allocated as stack space, RW.
-#define DISPOS_MMAP 5
-//Allocated as mapped memory, RW. (This is also usually tagged differently, since it's not
-//process-local.)
-
-#define BC_SPACE 0
-//Pointer to allocated region.
-#define BC_SIZE 1
-//Size of allocated region.
-#define BC_SZ 2
-
-char MMToPage(char *addr) {
-    return addr>>PAGE_SHIFT;
+char DrvCnsNumConsoles() {
+    return ListSize(_DrvCnsList);
 }
 
-char *MMPageAddr(char page) {
-    return page<<PAGE_SHIFT;
+char *DrvCnsAddress(char cnsnum) {
+    return ListElement(_DrvCnsList, cnsnum);
 }
 
-char MMInit(char *mmi, char *region, char size, char flags) {
-    char sz=0;
-    char pages;
-    char firstpage;
-    char *current=region;
-    char *end=region+size;
-    mmi[MMI_FLAGS]=flags;
-    pages=MMToPage(size);
-    firstpage=MMToPage(region);
-    //Place and initialize the PAST.
-    sz=PAST_SZ+PAS_SZ*pages;
-    mmi[MMI_PAST]=current;
-    current[PAST_ENTRIES]=pages;
-    current[PAST_ROOT]=firstpage;
-    current+=sz;
-    if(current>end) {
-        return ENOMEM;
+char *DrvCnsRoot(char *cnsaddr) {
+    return cnsaddr;
+}
+
+char DrvCnsGetWidth(char *cnsaddr) {
+    return cnsaddr[CNS_HIGH_SHIFT_COL]-cnsaddr[CNS_LOW_SHIFT_COL]+1;
+}
+
+char DrvCnsGetHeight(char *cnsaddr) {
+    return cnsaddr[CNS_HIGH_SHIFT_ROW]-cnsaddr[CNS_LOW_SHIFT_ROW]+1;
+}
+
+void DrvCnsSetCursorVisible(char *cnsaddr, char visible) {
+    cnsaddr[CNS_CURSOR_VISIBLE]=visible;
+}
+
+void DrvCnsSetCursorPos(char *cnsaddr, char x, char y) {
+    char width;
+    width=DrvCnsGetWidth(cnsaddr);
+    cnsaddr[CNS_CURSOR_POSITION]=(y*width+x)*CNS_CELLSZ;
+}
+
+char DrvCnsGetCursorX(char *cnsaddr) {
+    char width;
+    char cell;
+    width=DrvCnsGetWidth(cnsaddr);
+    cell=FTrunc(cnsaddr[CNS_CURSOR_POSITION]/CNS_CELLSZ);
+    return cell%width;
+}
+
+char DrvCnsGetCursorY(char *cnsaddr) {
+    char width;
+    char line;
+    width=DrvCnsGetWidth(cnsaddr);
+    line=FTrunc(cnsaddr[CNS_CURSOR_POSITION]/(CNS_CELLSZ*width));
+    return line-(cnsaddr[CNS_LOW_SHIFT_ROW]);
+}
+
+void DrvCnsNewLine(char *cnsaddr) {
+    DrvCnsSetCursorPos(cnsaddr, 0, DrvCnsGetCursorY(cnsaddr)+1);
+}
+
+void DrvCnsBackLine(char *cnsaddr) {
+    DrvCnsSetCursorPos(cnsaddr, 0, DrvCnsGetCursorY(cnsaddr)-1);
+}
+
+void DrvCnsBackSpace(char *cnsaddr) {
+    cnsaddr[CNS_CURSOR_POSITION]--;
+}
+
+void DrvCnsClear(char *cnsaddr) {
+    cnsaddr[CNS_CLEAR_SCREEN]=1;
+    cnsaddr[CNS_CURSOR_POSITION]=0;
+}
+
+void DrvCnsFormFeed(char *cnsaddr) {
+    cnsaddr[CNS_CURSOR_POSITION]=0;
+}
+
+char DrvCnsGetTabWidth() {
+    return drvCnsTabWidth;
+}
+
+void DrvCnsSetTabWidth(char width) {
+    drvCnsTabWidth=width;
+}
+
+void DrvCnsShift(char *cnsaddr, char amount) {
+    char width, newcp;
+    width=DrvCnsGetWidth(cnsaddr);
+    newcp=cnsaddr[CNS_CURSOR_POSITION]-amount*width*CNS_CELLSZ;
+#ifdef DEBUG_CNS
+    preserve ECX;
+    ECX=cnsaddr[CNS_CURSOR_POSITION];
+    mov port2, ecx;
+    ECX=newcp;
+    mov port3, ecx;
+    zap ECX;
+#endif
+    cnsaddr[CNS_CURSOR_POSITION]=newcp;
+    cnsaddr[CNS_SHIFT_ROWS]=amount;
+}
+
+char DrvCnsWrite(char *cnsaddr, char *s, char attrib) {
+    char *p;
+    char pos;
+    char lastpos;
+    char width;
+    char height;
+    p=s;
+    pos=cnsaddr[CNS_CURSOR_POSITION];
+    width=DrvCnsGetWidth(cnsaddr);
+    height=DrvCnsGetHeight(cnsaddr);
+    lastpos=width*height*CNS_CELLSZ;
+    while(*p) {
+        if(pos>=lastpos) {
+            DrvCnsShift(cnsaddr, 1);
+            pos=cnsaddr[CNS_CURSOR_POSITION];
+        }
+        //Special character handling
+        if(*p==drvCnsCharNewLine[0]) {
+            DrvCnsNewLine(cnsaddr);
+            pos=cnsaddr[CNS_CURSOR_POSITION];
+        } else if(*p==drvCnsCharTab[0]) {
+            DrvCnsSetCursorPos(cnsaddr, FTrunc(DrvCnsGetCursorX(cnsaddr)/drvCnsTabWidth), DrvCnsGetCursorY(cnsaddr));
+            pos=cnsaddr[CNS_CURSOR_POSITION];
+        } else if(*p==drvCnsCharCarriageReturn[0]) {
+            DrvCnsSetCursorPos(cnsaddr, 0, DrvCnsGetCursorY(cnsaddr));
+            pos=cnsaddr[CNS_CURSOR_POSITION];
+        } else if(*p==drvCnsCharFormFeed[0]) {
+            DrvCnsClear(cnsaddr);
+            pos=cnsaddr[CNS_CURSOR_POSITION];
+        } else if(*p==drvCnsCharBackSpace[0]) {
+            DrvCnsBackSpace(cnsaddr);
+            pos=cnsaddr[CNS_CURSOR_POSITION];
+        } else {
+            cnsaddr[pos++]=*p;
+            if(attrib!=CA_NOCHANGE) {
+                cnsaddr[pos++]=attrib;
+            }
+        }
+        p++;
     }
-    //Place and initialize the PTBL.
-    
-    
-    
+    cnsaddr[CNS_CURSOR_POSITION]=pos;
+#ifdef DEBUG_CNS
+    //DEBUG: Write out cursor positions to IO ports.
+    preserve ECX;
+    ECX=DrvCnsGetCursorX(cnsaddr);
+    mov port0, ecx;
+    ECX=DrvCnsGetCursorY(cnsaddr);
+    mov port1, ecx;
+    zap ECX;
+#endif
+    return p-s; //Number of characters parsed.
+}
+
+char DrvCnsEntry(char op, char *devptr) {
+    if(op==DRV_OP_CLEAR) {
+        ListClear(_DrvCnsList);
+    }
+    if(op==DRV_OP_INIT) {
+        if(!ListContains(_DrvCnsList, devptr)) {
+            ListAppend(_DrvCnsList, devptr);
+        }
+        return CNS_SIZE;
+    }
+    if(op==DRV_OP_STOP) {
+        ListRemove(_DrvCnsList, devptr);
+    }
+    if(op==DRV_OP_SCAN) {
+        return 0;
+    }
+    return 0;
+}
+
+char DrvCnsControlEntry(char ioctl, char *buffer) {
+    char *dev;
+    char temp;
+    if(ioctl==IOCTL_CAN_READ||ioctl==IOCTL_CAN_WRITE||ioctl==IOCTL_CAN_SEEK) {
+        if(ListSize(buffer)<1) {
+            return ENOMEM;
+        }
+        ListSet(buffer, 0, 1);
+        return 0;
+    } else if(ioctl==IOCTL_CAN_BLOCK) {
+        if(ListSize(buffer)<1) {
+            return ENOMEM;
+        }
+        ListSet(buffer, 0, 0);
+        return 0;
+    } else if(ioctl==IOCTL_READ_AVAIL) {
+        if(ListSize(buffer)<1) {
+            return ENOMEM;
+        }
+        dev=ListElement(buffer, 0);
+        if(!dev) {
+            return EBADVAL;
+        }
+        temp=DrvCnsGetWidth(dev);
+        temp*=DrvCnsGetHeight(dev)*CNS_CELLSZ;
+        ListSet(buffer, 0, dev[CNS_CURSOR_POSITION]-temp);
+        return 0;
+    } else if(ioctl==IOCTL_WRITE_AVAIL) {
+        if(ListSize(buffer)<1) {
+            return ENOMEM;
+        }
+        ListSet(buffer, 0, AVAIL_MAX);
+        return 0;
+    } else if(ioctl==IOCTL_GET_POS) {
+        if(ListSize(buffer)<1) {
+            return ENOMEM;
+        }
+        dev=ListElement(buffer, 0);
+        if(!dev) {
+            return EBADVAL;
+        }
+        temp=FTrunc(dev[CNS_CURSOR_POSITION]/CNS_CELLSZ);
+        ListSet(buffer, 0, temp);
+        return 0;
+    } else if(ioctl==IOCTL_SET_POS) {
+        if(ListSize(buffer)<2) {
+            return ENOMEM;
+        }
+        dev=ListElement(buffer, 0);
+        if(!dev) {
+            return EBADVAL;
+        }
+        temp=ListElement(buffer, 1);
+        dev[CNS_CURSOR_POSITION]=temp*CNS_CELLSZ;
+        return 0;
+    }
+    //Not implemented.
+    return 0;
+}
+
+char _drvCnsIOBuffer[CNS_IOBUF_SZ];
+
+char DrvCnsIOEntry(char *dev, char op, char *buffer) {
+    char temp;
+    char count;
+    char maxpos;
+    char *p;
+    if(op==IO_READ) {
+        count=0;
+        maxpos=DrvCnsGetWidth(dev);
+        maxpos*=DrvCnsGetHeight(dev)*CNS_CELLSZ;
+        if(dev[CNS_CURSOR_POSITION]<maxpos) {
+            temp=ListAppend(buffer, dev[dev[CNS_CURSOR_POSITION]]);
+            while(temp&&(dev[CNS_CURSOR_POSITION]<maxpos)) {
+                count++;
+                dev[CNS_CURSOR_POSITION]=dev[CNS_CURSOR_POSITION]+CNS_CELLSZ;
+                temp=ListAppend(buffer, dev[dev[CNS_CURSOR_POSITION]]);
+            }
+        }
+        return count;
+    } else if(op==IO_WRITE) {
+        //Kill me for this tomfoolery :P
+        //Then again, why reinvent the wheel?
+        count=0;
+        while(ListSize(buffer)) {
+            p=ListAddress(buffer, 0);
+            maxpos=ListSize(buffer);
+            for(temp=0; (temp<CNS_IOBUF_SZ-1)&&temp<maxpos; temp++) {
+                _drvCnsIOBuffer[temp]=*p;
+                p++;
+                count++;
+            }
+            DrvCnsWrite(dev, _drvCnsIOBuffer, CA_NOCHANGE);
+            ListShift(buffer, temp);
+        }
+        return count;
+    }
+    return 0;
+}
+        
+        
+//[INITFUNC] DrvCnsInit();
+//[INITTIME] DRIVERS_BASIC 1
+void DrvCnsInit() {
+    ListInit(_DrvCnsList, DRV_LIST_SZ-LST_LIST);
+    DrvSetDriverEntry(DRV_TYPE_CONSOLE, DrvCnsEntry);
+    DrvSetCountEntry(DRV_TYPE_CONSOLE, DrvCnsNumConsoles);
+    DrvSetAddressEntry(DRV_TYPE_CONSOLE, DrvCnsAddress);
+    DrvSetRootEntry(DRV_TYPE_CONSOLE, DrvCnsRoot);
+    DrvSetIOEntry(DRV_TYPE_CONSOLE, DrvCnsIOEntry);
+    DrvSetControlEntry(DRV_TYPE_CONSOLE, DrvCnsControlEntry);
+}
+
 #endif
