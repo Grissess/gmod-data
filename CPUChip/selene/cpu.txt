@@ -53,14 +53,23 @@
 //occurs when the address is not between (-2^48+1, 2^48) (id est, it cannot fit in a signed
 //48-bit integer), when it is a floating point number, or if it simply isn't a number at all
 //(which should never happen). The parameter is the offending address.
-#define INT_MEMRD 29
-//Raised with a 0 parameter by the VM when the RQCAP (Request Capture) register is set and MEMRQ
-//is 2 (reading). Requests of this kind are generated when encountering pages with the MF_OVERRIDE
-//flag set.
-#define INT_MEMWR 30
-//Raised with the LADD register by the VM when the RQCAP (Request Capture) register is set and MEMRQ
-//is 3 (writing). Requests of this kind are generated when encountering pages with the MF_OVERRIDE
-//flag set.
+#define INT_MEMRD 28
+//Raised with MEMADDR set to the address to be read, and LADD set to the value actually read
+//(after page remapping, only if the page is not disabled). User code may observe that
+//MEMRQ == 4 in this case. When this interrupt returns, the value in LADD becomes the value
+//returned from the original read. (Note that LADD can be CPUSET.)
+#define INT_MEMWR 29
+//Raised with MEMADDR set to the address to be written, and LADD set to the value to be written
+//(*before* page permission checks and mapping, *but* the cached PTE that resulted in a
+//MF_OVERRIDE is consulted regardless of what MEMADDR is set to, so if that page is, e.g.,
+//disabled or not writable, the write is doomed to fail anyway.) User code may observe
+//MEMRQ == 5 in this case. When the interrupt returns, the value in MEMADDR is loaded into the
+//writing address, and the value in LADD is loaded as the new written value, allowing the
+//interrupt to override either (but see the PTE cache bug before). Both can be CPUSET.
+#define INT_PFAULT 30
+//Raised with the faulting address whenever the MF_TRAP flag is set for the requested page. After the
+//interrupt returns, the operation continues as normal, *but does not invalidate the cached PTE from
+//the beginning*, so this cannot be used to modify the PTE. Instead, use the MEMxx interrupts above.
 
 #define INTERR_PCALL 1
 //The ZVM has a Lua bug! A pcall failed to run the instruction.
@@ -407,5 +416,17 @@ struct xiframe {
 //A read access.
 #define MEMRQ_WRITE 3
 //A write access.
+
+#define CPUID_VERSION 0
+// Version of the ZVM. At the time of this writing, nominally 1000.
+#define CPUID_RAMSIZE 1
+// How much internal RAM this has. As an address, this refers to the first "byte" outside the address space of the CPU--the first external address. "Hi-speed" components will interpret this as an operation on address 0.
+#define CPUID_TYPE 2
+// Which processor hardware we're running on (determines some of the ISA). Currently defined:
+// 0: ZCPU (basic)
+// 1: ZGPU (with graphics instructions)
+// 2: ZSPU (with audio instructions)
+#define CPUID_ROMSIZE 3
+// How much internal ROM this has. Usually the same as the internal RAM (which is loaded herefrom on reset). Normally written by the CPU tool itself, but can also be written programmatically (RDPG, WRPG, ERPG -- which writes 0s)
 
 #endif

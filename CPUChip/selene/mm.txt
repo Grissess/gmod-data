@@ -20,7 +20,7 @@ char mm_init(char *start, char size) {
 
 char *mm_split(char *hdr, char size) {
     mm_header *reg = hdr, *new;
-    if(reg.size > size - SIZEOF_MM_HEADER) return NULL;
+    if(reg.size < size + 2 * SIZEOF_MM_HEADER) return NULL;
     new = reg + size + SIZEOF_MM_HEADER;
     new.flags = 0;
     if(reg.flags & MMF_FINAL) {

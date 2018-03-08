@@ -11,6 +11,10 @@ char *pg_round(char *addr) {
     return PAGESIZE * to_int(addr >> PAGEBITS);
 }
 
+char *pg_roundup(char *addr) {
+    return PAGESIZE * to_int((addr + PAGESIZE - 1) >> PAGEBITS);
+}
+
 char *pmalloc_top = NULL;
 
 void pfree(char *addr) {
@@ -30,6 +34,7 @@ void pfreerange(char *start, char *end) {
 }
 
 char *pmalloc() {
+    if(!pmalloc_top) return 0;
     char *pg = pmalloc_top;
     pmalloc_top = *pmalloc_top;
     return pg;

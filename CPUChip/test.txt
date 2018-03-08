@@ -2,12 +2,15 @@
 #pragma set OutputResolveListing true
 #pragma set NoUnreferencedLeaves false
 
-#define MACRO fint
+#include <selene/dev.txt>
 
-LOL:
-mov eax, 3;
-mov ebx, 4;
-div eax, ebx;
-HUE:
-//MACRO fint;
-mov port0, eax;
+for(i = 0; i < 10; i++) {
+    cns[i * 2] = '0' + i;
+    cns[i * 2 + 1] = 999;
+}
+cns[CNS_CURSOR_VISIBLE] = 1;
+cns[CNS_CURSOR_POSITION] = 4;
+int 1;
+
+char *cns = 65536;
+char i;

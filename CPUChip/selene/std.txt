@@ -20,4 +20,72 @@ char to_int(float v) {
     return v;
 }
 
+char insn_cpuid(char param) {
+    CPUID param;
+}
+
+char insn_max(char a, char b) {
+    mov EAX, [EBP:2];
+    max EAX, [EBP:3];
+}
+
+char insn_min(char a, char b) {
+    mov EAX, [EBP:2];
+    min EAX, [EBP:3];
+}
+
+char strlen(char *s) {
+    char n = 0;
+    while(*s) {
+        s++;
+        n++;
+    }
+    return n;
+}
+
+void memcpy_mcopy(char *dst, char *src, char n) {
+    preserve ESI, EDI;
+    mov ESI, src;
+    mov EDI, dst;
+    mcopy n;
+    zap ESI, EDI;
+}
+
+void memcpy(char *dst, char *src, char n) {
+    char b;
+    if(n <= 0) return;
+    while(n > 0) {
+        b = insn_min(n, 8192);
+        memcpy_mcopy(dst, src, b);
+        dst += b;
+        src += b;
+        n -= b;
+    }
+}
+
+void itoa(char n, char *radix, char *result) {
+    char base = strlen(radix);
+    char *start = result;
+    char tmp;
+    if(n < 0) {
+        *result = '-';
+        result++;
+        start++;
+    }
+    while(n > 0) {
+        *result = n % base;
+        n = to_int(n / base);
+        result++;
+    }
+    *result = 0;
+    result--;
+    while(start < result) {
+        tmp = *start;
+        *start = *result;
+        *result = tmp;
+        start++;
+        result--;
+    }
+}
+
 #endif
