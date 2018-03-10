@@ -24,15 +24,16 @@ void printk_find() {
     char *root = insn_cpuid(CPUID_RAMSIZE);
     char i;
     
+    root[EBUS_REG_CDATA_SZ] = EBUS_SIZE;
     root[EBUS_REG_RECURSE] = 0;
     root[EBUS_REG_SCAN] = 1;
     for(i = 0; i < EBUS_DEVICES; i++) {
         if(root[EBUS_REG_DEVTYPE + i] == EBUS_TYPE_CONSOLE) {
-            root[2 * i] = EBUS_SIZE;
-            root[2 * i + 1] = EBUS_SIZE + CNS_SIZE;
-            printk_console = root + EBUS_SIZE;
+            root[2 * i] = 1;
+            root[2 * i + 1] = 1 + CNS_SIZE;
+            printk_console = root + EBUS_SIZE + 1;
             printk_reset();
-            printk("early printk on device %p\n", i);
+            printk("early printk on device %d @%p\n", i, printk_console);
             return;
         }
     }
@@ -73,10 +74,15 @@ void putsk(char *s) {
     }
 }
 
-char printk_itoa_buffer[32];
+char printk_xtoa_buffer[32];
 void putik(char n, char *radix) {
-    itoa(n, radix, printk_itoa_buffer);
-    putsk(printk_itoa_buffer);
+    itoa(n, radix, printk_xtoa_buffer, 32);
+    putsk(printk_xtoa_buffer);
+}
+
+void putfk(float n, char *radix, char prec) {
+    ftoa(n, radix, prec, printk_xtoa_buffer, 32);
+    putsk(printk_xtoa_buffer);
 }
 
 void printk(char *str, ...) {
@@ -85,25 +91,32 @@ void printk(char *str, ...) {
     while(*s) {
         if(*s == '%') {
             s++;
-            if(s == 'p' || s == 'x') {
-                putik(*arg, "0123456789abcdef");
+            if(*s == 'p') {
+                putsk("0x");
+                putik(*arg, HEX_RADIX);
                 arg++;
-            } else if(s == 'X') {
-                putik(*arg, "0123456789ABCDEF");
+            } else if(*s == 'x') {
+                putik(*arg, LHEX_RADIX);
                 arg++;
-            } else if(s == 'd') {
-                putik(*arg, "0123456789");
+            } else if(*s == 'X') {
+                putik(*arg, UHEX_RADIX);
                 arg++;
-            } else if(s == 'o') {
-                putik(*arg, "01234567");
+            } else if(*s == 'd') {
+                putik(*arg, DEC_RADIX);
                 arg++;
-            } else if(s == 'b') {
-                putik(*arg, "01");
+            } else if(*s == 'o') {
+                putik(*arg, OCT_RADIX);
                 arg++;
-            } else if(s == 'c') {
+            } else if(*s == 'b') {
+                putik(*arg, BIN_RADIX);
+                arg++;
+            } else if(*s == 'f') {
+                putfk(*arg, DEC_RADIX, 6);
+                arg++;
+            } else if(*s == 'c') {
                 putck(*arg);
                 arg++;
-            } else if(s == 's') {
+            } else if(*s == 's') {
                 putsk(*arg);
                 arg++;
             } else {

@@ -4,7 +4,9 @@ int 1;
 #include <selene/printk.txt>
 
 void main() {
+    float pi = -insn_fpi() * 10;
     printk_init();
+    printk("-10 * Pi is %d or %f\n", pi, pi);
     printk("Halting system.\n");
 }
 

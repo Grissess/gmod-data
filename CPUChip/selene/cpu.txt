@@ -429,4 +429,10 @@ struct xiframe {
 #define CPUID_ROMSIZE 3
 // How much internal ROM this has. Usually the same as the internal RAM (which is loaded herefrom on reset). Normally written by the CPU tool itself, but can also be written programmatically (RDPG, WRPG, ERPG -- which writes 0s)
 
+#define PAGEBITS 7
+//#define PAGESIZE (1 << PAGEBITS)
+#define PAGESIZE 128
+//#define PAGEMASK (PAGESIZE - 1)
+#define PAGEMASK 127
+
 #endif

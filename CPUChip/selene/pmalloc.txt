@@ -2,10 +2,7 @@
 #define SELENE_PMALLOC
 
 #include <selene/std.txt>
-
-#define PAGEBITS 7
-//#define PAGESIZE (1 << PAGEBITS)
-#define PAGESIZE 128
+#include <selene/cpu.txt>
 
 char *pg_round(char *addr) {
     return PAGESIZE * to_int(addr >> PAGEBITS);
