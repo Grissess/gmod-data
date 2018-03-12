@@ -6,6 +6,8 @@
 
 #define NULL 0
 
+#include <selene/cpu.txt>
+
 char bits_add(char v, char b) {
     return v | b;
 }
@@ -18,33 +20,6 @@ char bits_remove(char v, char b) {
 char to_int(float v) {
     FINT v;
     return v;
-}
-
-char insn_cpuid(char param) {
-    CPUID param;
-}
-
-float insn_max(float a, float b) {
-    mov EAX, [EBP:2];
-    max EAX, [EBP:3];
-}
-
-float insn_min(float a, float b) {
-    mov EAX, [EBP:2];
-    min EAX, [EBP:3];
-}
-
-float insn_timer() {
-    TIMER EAX;
-}
-
-float insn_ffrac(float val) {
-    MOV EAX, [EBP:2];
-    FFRAC EAX;
-}
-
-float insn_fpi() {
-    FPI EAX;
 }
 
 char strlen(char *s) {
@@ -81,6 +56,7 @@ void itoa(char n, char *radix, char *result, char resz) {
     char *start = result;
     char *end = result + resz - 2;
     char tmp;
+    if(resz <= 2) return;
     if(base <= 0) return;
     if(n < 0) {
         *result = '-';
@@ -112,38 +88,16 @@ void itoa(char n, char *radix, char *result, char resz) {
 
 void ftoa(float n, char *radix, char prec, char *result, char resz) {
     char base = strlen(radix);
-    char *start = result;
-    char *end = result + resz - 3;
+    char *end = result + resz - 2;
     char *frac;
     char tmp;
+    if(resz <= 3) return;
     if(base <= 0) return;
+    itoa(n, radix, result, resz - 1);
     if(n < 0) {
-        *result = '-';
-        result++;
-        start++;
         n = -n;
     }
-    tmp = to_int(n);
-    if(tmp == 0) {
-        *result = '0';
-        result++;
-    }
-    while(tmp > 0) {
-        *result = radix[tmp % base];
-        tmp = to_int(tmp / base);
-        result++;
-        if(result == end) break;
-    }
-    frac = result;
-    result--;
-    while(start < result) {
-        tmp = *start;
-        *start = *result;
-        *result = tmp;
-        start++;
-        result--;
-    }
-    end++;
+    frac = result + strlen(result);
     *frac = '.';
     frac++;
     tmp = insn_ffrac(n);
@@ -165,5 +119,4 @@ string LHEX_RADIX, "01234567889abcdef";
 string DEC_RADIX, "0123456789";
 string OCT_RADIX, "01234567";
 string BIN_RADIX, "01";
-
 #endif

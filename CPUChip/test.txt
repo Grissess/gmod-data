@@ -2,15 +2,19 @@
 #pragma set OutputResolveListing true
 #pragma set NoUnreferencedLeaves false
 
-#include <selene/dev.txt>
+MOV #-6, 999;
+jmp main;
 
-for(i = 0; i < 10; i++) {
-    cns[i * 2] = '0' + i;
-    cns[i * 2 + 1] = 999;
+struct foo {
+    char a;
+    char r[32];
+    char b;
+};
+
+foo bar;
+
+void main() {
+    bar.a = 1;
+    bar.b = 2;
 }
-cns[CNS_CURSOR_VISIBLE] = 1;
-cns[CNS_CURSOR_POSITION] = 4;
 int 1;
-
-char *cns = 65536;
-char i;

@@ -24,7 +24,7 @@
 #define INT_STACK 6
 //Stack overflow/underflow; parameter is ESP pointing at a valid position.
 #define INT_IO 7
-//Memory read/write fault; raised when a page is disabled, or an external access is made.
+//Memory read/write fault; raised when a page is disabled, or an external access fails.
 //The parameter is the offending address.
 #define INT_MEMBUS 8
 //Bus fault, never actually occurs in the VM.
@@ -70,6 +70,9 @@
 //Raised with the faulting address whenever the MF_TRAP flag is set for the requested page. After the
 //interrupt returns, the operation continues as normal, *but does not invalidate the cached PTE from
 //the beginning*, so this cannot be used to modify the PTE. Instead, use the MEMxx interrupts above.
+#define INT_DEBUG 31
+//Debug trap; raised during CPU debugging. Intercepting this breaks the CPU's debugger (not that
+//it needs the help.)
 
 #define INTERR_PCALL 1
 //The ZVM has a Lua bug! A pcall failed to run the instruction.
@@ -179,7 +182,7 @@ struct ivec {
 #define IF_NEAR 16
 //Do not set CS (it is still pushed onto the frame, but the value is unaffected).
 #define IF_ACTIVE 32
-//Interrupt enabled. (Affects all other functionality.)
+//Interrupt enabled. (Affects all other functionality except IF_CMPR.)
 #define IF_EXT 64
 //Interrupt can be invoked externally. Note that it doesn't HAVE to be, but trying to
 //invoke an external interrupt without this flag raises interrupt 13:4 instead.
@@ -189,6 +192,8 @@ struct ivec {
 #define IF_SETPTBE 256
 //Set PTBE to 1 when invoked. PTBL is unaffected, and the old PTBE is NOT restored on
 //return. The use of 1 is probably a bug.
+#define IF_PUSHR 512
+//Push all R0..R31 when this is invoked externally. Requires IF_EXT to be set as well.
 
 //Regardless of which interrupt method is used, the last two bytes on the stack are
 //the CS:IP pair to return to. Both EXTRET and IRET eventually behave as RETF, though
@@ -240,6 +245,7 @@ struct xiframe {
     char _top;
     char cs_;
     char ip_;
+    char _ip_;
     char cmpr_;
     char eax_;
     char ebx_;
@@ -248,7 +254,7 @@ struct xiframe {
     char _esp_;
     char esi_;
     char edi_;
-    char cs_;
+    char _cs_;
     char _ss_;
     char ds_;
     char fs_;
@@ -257,7 +263,45 @@ struct xiframe {
     char ks_;
     char ls_;
 }
-#define SIZEOF_XIFRAME 19
+#define SIZEOF_XIFRAME 20
+
+struct xirframe {
+    char _top;
+    char cs_;
+    char ip_;
+    char r[32];
+    char _ip_;
+    char cmpr_;
+    char eax_;
+    char ebx_;
+    char ecx_;
+    char edx_;
+    char _esp_;
+    char esi_;
+    char edi_;
+    char _cs_;
+    char _ss_;
+    char ds_;
+    char fs_;
+    char gs_;
+    char es_;
+    char ks_;
+    char ls_;
+}
+#define SIZEOF_XIRFRAME 52
+
+struct pushaframe {
+    char _top;
+    char eax_;
+    char ebx_;
+    char ecx_;
+    char edx_;
+    char _esp_;
+    char ebp_;
+    char esi_;
+    char edi_;
+}
+#define SIZEOF_PUSHAFRAME 9
 
 #define REG_IP 0
 //Local Instruction Pointer.
@@ -434,5 +478,40 @@ struct xiframe {
 #define PAGESIZE 128
 //#define PAGEMASK (PAGESIZE - 1)
 #define PAGEMASK 127
+
+char insn_cpuid(char param) {
+    CPUID param;
+}
+
+float insn_max(float a, float b) {
+    mov EAX, [EBP:2];
+    max EAX, [EBP:3];
+}
+
+float insn_min(float a, float b) {
+    mov EAX, [EBP:2];
+    min EAX, [EBP:3];
+}
+
+float insn_timer() {
+    TIMER EAX;
+}
+
+float insn_ffrac(float val) {
+    MOV EAX, [EBP:2];
+    FFRAC EAX;
+}
+
+float insn_fpi() {
+    FPI EAX;
+}
+
+float insn_cpuget(char reg) {
+    CPUGET EAX, [EBP:2];
+}
+
+void insn_cpuset(char reg, float val) {
+    CPUSET [EBP:2], [EBP:3];
+}
 
 #endif

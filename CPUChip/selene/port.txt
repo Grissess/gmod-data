@@ -1,0 +1,11 @@
+#ifndef SELENE_PORT
+#define SELENE_PORT
+
+void ports_reset() {
+    char *pt;
+    for(pt = -8; pt <= -1; pt++) {
+        *pt = 0;
+    }
+}
+
+#endif

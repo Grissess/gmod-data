@@ -1,12 +1,21 @@
-call main;
-int 1;
+CALL main;
+CLEF;
+INT 1;
 
-#include <selene/printk.txt>
+#include <selene/interrupt.txt>
+#include <selene/pmalloc.txt>
+#include <selene/devtree.txt>
+#include <selene/port.txt>
 
 void main() {
-    float pi = -insn_fpi() * 10;
+    ports_reset();
     printk_init();
-    printk("-10 * Pi is %d or %f\n", pi, pi);
+    printk_set_debug(1);
+    interrupt_init();
+    pmalloc_init(text_end);
+    devtree_init();
+    //printkln("Testing spurious interrupt\n");
+    //INT 21;
     printk("Halting system.\n");
 }
 

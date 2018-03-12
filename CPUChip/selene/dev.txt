@@ -45,6 +45,9 @@
 #define EBUS_TYPE_SOUND 17
 #define EBUS_TYPE_CONSTANT 18
 #define EBUS_TYPE_DPORT 19
-#define EBUS_TYPE_RAM 20
+#define EBUS_TYPE_GATE 20
+#define EBUS_TYPES 21
+
+#define MAX_DEVICE_SIZE 1048576
 
 #endif
