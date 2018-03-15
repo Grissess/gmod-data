@@ -18,6 +18,8 @@
 // Stack is an xiframe
 #define IMODE_EXTERNAL_PUSHR 3
 // Stack is an xirframe
+#define IMODE_ARTIFICIAL 4
+// Stack is undefined
 
 char interrupt_table[SIZEOF_INTR_TBL];
 char interrupt_handlers[NUM_INTERRUPTS];
@@ -69,7 +71,6 @@ void interrupt_handle(char *stack, char intr, char ladd) {
     char was_external = interrupt_was_external(stack, intr, ladd);
     ivec *intr_vec = interrupt_get_vector(intr);
     char mode;
-    char *handler;
     if(was_external) {
         if(intr_vec.flags & IF_PUSHR) {
             mode = IMODE_EXTERNAL_PUSHR;
@@ -82,17 +83,23 @@ void interrupt_handle(char *stack, char intr, char ladd) {
     if(intr != to_int(intr)) {
         panic("Non-integer interrupt %f:%p\n", intr, ladd);
     }
+    interrupt_trigger(stack, mode, intr, ladd);
+    return mode;
+}
+
+void interrupt_trigger(char *stack, char mode, char intr, char ladd) {
+    char *handler;
     if(intr > NUM_INTERRUPTS) {
         panic("Interrupt beyond NIDT %d:%p\n", intr, ladd);
     }
     handler = interrupt_handlers[intr];
     handler(stack, mode, intr, ladd);
-    return mode;
 }
 
 interrupt_trampoline:
-    CPUGET port4, REG_LINT;
-    CPUGET port5, REG_LADD;
+    CLI;
+    CPUGET [ES:-5], REG_LINT;
+    CPUGET [ES:-6], REG_LADD;
     PUSHA;
     MOV EAX, ESP;
     ADD EAX, SIZEOF_PUSHAFRAME;
@@ -126,12 +133,22 @@ void interrupt_init() {
         interrupt_table[SIZEOF_IVEC * i + 3] = IF_ACTIVE | IF_EXT | IF_PUSHR;
         interrupt_handlers[i] = interrupt_no_handler;
     }
+    interrupt_set_cs(insn_cpuget(REG_CS));
     debug_printkln("installing IDTR at %p num %d size %d\n", interrupt_table, NUM_INTERRUPTS, SIZEOF_INTR_TBL);
     insn_cpuset(REG_IDTR, interrupt_table);
     insn_cpuset(REG_NIDT, NUM_INTERRUPTS);
     STEF;
     STI;
     debug_printkln("interrupts enabled\n");
+}
+
+void interrupt_set_cs(char cs_) {
+    char i;
+    debug_printkln("interrupt_set_cs %p\n", cs_);
+    for(i = 0; i < NUM_INTERRUPTS; i++) {
+        interrupt_table[SIZEOF_IVEC * i + 1] = cs_;
+    }
+    printkln("interrupts prepared for segment %p\n", cs_);
 }
 
 void interrupt_install(char intr, char *handler) {

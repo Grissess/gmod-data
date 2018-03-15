@@ -70,6 +70,7 @@
 //Raised with the faulting address whenever the MF_TRAP flag is set for the requested page. After the
 //interrupt returns, the operation continues as normal, *but does not invalidate the cached PTE from
 //the beginning*, so this cannot be used to modify the PTE. Instead, use the MEMxx interrupts above.
+//Note that the docs have a bug--this is not called as an external interrupt.
 #define INT_DEBUG 31
 //Debug trap; raised during CPU debugging. Intercepting this breaks the CPU's debugger (not that
 //it needs the help.)
@@ -358,29 +359,34 @@ struct pushaframe {
 #define REG_CPAGE 31
 //Current page. (Used in the page protection logic. Read only.)
 #define REG_IF 32
-//Interrupt Flag. (Usually cleared with CLI respectively. Locally enables/disables interrupts.)
+//Interrupt Flag. (Usually cleared with CLI. Locally enables/disables interrupts. See REG_NIF for STI.)
 #define REG_PF 33
-//Protected Flag. (Set whenever CPAGE's runlevel is greater than 0. Prevents certain potentially-system-compromising features.)
+//Protected Flag. (Set/cleared with STP/CLP. Prevents certain potentially-system-compromising features.)
 #define REG_EF 34
 //Extended Flag. (Usually set/cleared with STEF/CLEF respectively. Locally enables/disables various advanced features.)
 #define REG_NIF 35
 //Next Interrupt Flag. (Set by STI; if set during the next instruction fetch, IF is set, and this is cleared. This logic prevents
-//interrupts during the final IRET/EXTRET of an interrupt handler.)
+//interrupts during the final IRET/EXTRET/etc. of an interrupt handler.)
 #define REG_MF 36
 //Memory Flag. (Usually set/cleared with STM/CLM respectively. Locally enables/disables memory paging.)
 #define REG_PTBL 37
 //Page table pointer. (Absolute physical address.)
 #define REG_PTBE 38
 //Page table size. (Specified in entries. The table must have one more entry than this to accomodate the "default" entry at index 0.)
+//Defaults to 0--only the default entry would be considered.
 #define REG_PCAP 39
 //Paging Capability. (Set by default to enable logical addressing rather than physical addressing in most cases when MF is set.)
+//Unset by the processor in a few important places:
+//- When processor logic is reading/writing the page table (id est, accesses to the PTBL are absolute);
+//- When the processor is reading an interrupt vector (id est, the interrupt table is absolute)
+//User code may unset it, causing further accesses to be absolute until it is set. The effect is similar to (arguably superfluous to) MF.
 #define REG_RQCAP 40
 //Memory request delay capability. (Set by default to enable page trapping on read/write. Delays actual memory flushing--like a cache.)
 //------------------------
 #define REG_PPAGE 41
 //Previous page. (Used in the page protection logic. Read only.)
 #define REG_MEMRQ 42
-//Memory request. (When RQCAP is set, 1 indicates a delayed operation. 2 and 3 represent read and write requests, respectively.)
+//Memory request. (When RQCAP is set, 1 indicates a delayed operation. 2-5 represent read and write requests; see INT_MEMxx above.)
 //------------------------
 #define REG_RAMSize 43
 //Internal RAM size. (Amount installed on-chip, not including memory devices outside the chip. Read only.)
@@ -456,10 +462,15 @@ struct pushaframe {
 //For MEMRQ:
 #define MEMRQ_DELAYED 1
 //A delayed access.
-#define MEMRQ_READ 2
-//A read access.
-#define MEMRQ_WRITE 3
-//A write access.
+#define MEMRQ_READ_BEGINNING 2
+//A read access was just invoked.
+#define MEMRQ_WRITE_BEGINNING 3
+//A write access was just invoked.
+#define MEMRQ_READ 4
+//A read access is being handled (code observes this state)
+#define MEMRQ_WRITE 5
+//A write access is being handled (code observes this state)
+
 
 #define CPUID_VERSION 0
 // Version of the ZVM. At the time of this writing, nominally 1000.
@@ -478,6 +489,35 @@ struct pushaframe {
 #define PAGESIZE 128
 //#define PAGEMASK (PAGESIZE - 1)
 #define PAGEMASK 127
+
+#define MF_DISABLE 1
+//Disables the page--accesses to it fail with an IO fault (INT_IO).
+#define MF_REMAP 2
+//Causes access to the page to remap to another physical page (no further mapping is done).
+//The target page is specified by the second byte of the two-byte page entry.
+#define MF_TRAP 4
+//Raises INT_PFAULT (see above), but does not halt the access. See the interrupt above for
+//important details, such as a PTE cache bug. Note that the docs have a bug--this is not
+//an external interrupt.
+#define MF_OVERRIDE 8
+//Sets the MEMRQ register (see above), and raises INT_MEMRD for reading or INT_MEMWR for writing.
+//On reading, the actually returned data will be whatever is in the LADD register (which may be
+//set with CPUSET). On writing, the actually written data will be whatever is in the LADD register
+//at whatever is in the MEMADDR register. See both interrupts above for important details, such as
+//a PTE cache bug while writing.
+#define MF_NOREAD 32
+//Causes a read access violation (INT_PPREAD) when an attempt is made to read and halts access.
+#define MF_NOWRITE 64
+//Causes a write access violation (INT_PPWRITE) when an attempt is made to write and halts access.
+#define MF_NOEXEC 128
+//Cause an execution access violation (INT_PPEXEC) when an attempt is made to execute (from runlevel!=0)
+//and halts the jump (id est, the jump becomes a NOP).
+
+#define MF_RUNLEVEL_SHIFT 8
+//How far to right-shift the flags to get the (unmasked) runlevel.
+#define MF_RUNLEVEL_MASK 255
+//The AND mask to apply to the resulting shift to get the runlevel.
+#define MF_MAX_RUNLEVEL 255
 
 char insn_cpuid(char param) {
     CPUID param;

@@ -57,7 +57,7 @@ void panic_backtrace(char *base) {
 string panic_header, "panic: ";
 
 panic:
-    MOV port7, [EBP:1];
+    MOV [ES:-8], [EBP:1];
     PUSHA;
     CALL printk_is_ready;
     CMP EAX, 0

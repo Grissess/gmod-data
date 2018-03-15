@@ -9,7 +9,7 @@ ram_sizes:
     db 8, 64, 1024, 4096, 32768, 131072, 1048576, 0
     
 char devtree_found_console;
-void devtree_init() {
+char devtree_init() {
     char *ext = insn_cpuid(CPUID_RAMSIZE);
     char sz;
     debug_printkln("devtree_init\n");
@@ -23,6 +23,7 @@ void devtree_init() {
         printkln("assuming console on root device\n");
     }
     printkln("mapped %p (%d) device bytes\n", sz, sz);
+    return sz + ext;
 }
 
 char devtree_scan_ebus(char *ebus) {

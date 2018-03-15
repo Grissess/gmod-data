@@ -1,54 +1,27 @@
-#ifndef SELENE_UVM
-#define SELENE_UVM
+CALL main;
+CLEF;
+INT 1;
 
-#include <selene/cpu.txt>
+#include <selene/uvm.txt>
 #include <selene/pmalloc.txt>
-#include <selene/std.txt>
-#include <selene/panic.txt>
+#include <selene/devtree.txt>
+#include <selene/port.txt>
 
-#define PF_PRESENT 1
-#define PF_DIRTY 2
-
-struct pgdir {
-    char ents[PAGESIZE];
+void main() {
+    char pasize;
+    MOV ES, 0;  // For IO addressing
+    ports_reset();
+    iolog_init();
+    printk_init();
+    printk_set_debug(1);
+    interrupt_init();
+    pmalloc_init(text_end);
+    pasize = devtree_init();
+    printkln("%p (%d) b phymem; %d free pages\n", pasize, pasize, pmalloc_pages);
+    uvm_init(pasize);
+    //printkln("Testing spurious interrupt\n");
+    //INT 21;
+    printk("Halting system.\n");
 }
 
-#define MODE_READ 1
-#define MODE_WRITE 2
-#define MODE_POPULATE 4
-
-char *uvm_resolve(pgdir *pt, char ent, char mode) {
-    char pte;
-    ent = ent & PAGEMASK;
-    pte = pt[ent];
-    if(!(pte & PF_PRESENT)) {
-        if(mode & MODE_POPULATE) {
-            pte = pmalloc();
-            if(!ent) {
-                panic("out of memory");
-            }
-            pte = pte | PF_PRESENT;
-            pt[ent] = pte;
-        } else {
-            return 0;
-        }
-    }
-    if(mode & MODE_WRITE) {
-        pte = pte | PF_DIRTY;
-        pt[ent] = pte;
-    }
-    return bits_remove(pte, PAGEMASK);
-}
-
-char *uvm_walk(pgdir *pl3, char *va, char mode) {
-    char *lvl;
-    lvl = uvm_resolve(pl3, (va >> (3 * PAGEBITS)), mode);
-    if(lvl == 0) return 0;
-    lvl = uvm_resolve(lvl, (va >> (2 * PAGEBITS)), mode);
-    if(lvl == 0) return 0;
-    lvl = uvm_resolve(lvl, (va >> PAGEBITS), mode);
-    if(lvl == 0) return 0;
-    return lvl | (va & PAGEMASK);
-}
-
-#endif
+text_end:

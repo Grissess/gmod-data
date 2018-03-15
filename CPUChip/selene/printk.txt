@@ -4,6 +4,7 @@
 #include <selene/dev.txt>
 #include <selene/cpu.txt>
 #include <selene/std.txt>
+#include <selene/port.txt>
 
 char *printk_console = 0;
 char printk_width = 0;
@@ -62,6 +63,7 @@ char printk_is_ready() {
 
 void putck(char c) {
     char pos;
+    iolog_putc(c);
     if(!printk_is_ready()) return;
     pos = to_int(printk_console[CNS_CURSOR_POSITION] / 2);
     if(c == '\n') {
@@ -156,16 +158,19 @@ char printk_get_debug() {
     return printk_debugging;
 }
 
-string printkln_header, "[%f] ";
+string printkln_header, "[%f](%p;%d) ";
 
 printkln:
     PUSHA;
+    MOV EAX, [ESP:9];
+    PUSH EAX;
+    PUSH EAX;
     TIMER EAX;
     PUSH EAX;
     PUSH printkln_header;
-    MOV ECX, 2;
+    MOV ECX, 4;
     CALL printk;
-    ADD ESP, 2;
+    ADD ESP, 4;
     POPA;
     JMP printk;
 

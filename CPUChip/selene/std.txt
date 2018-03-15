@@ -115,7 +115,7 @@ void ftoa(float n, char *radix, char prec, char *result, char resz) {
 
 string UHEX_RADIX, "0123456789ABCDEF";
 HEX_RADIX:
-string LHEX_RADIX, "01234567889abcdef";
+string LHEX_RADIX, "0123456789abcdef";
 string DEC_RADIX, "0123456789";
 string OCT_RADIX, "01234567";
 string BIN_RADIX, "01";
